@@ -1,0 +1,696 @@
+import time as t
+import random
+import tkinter as tk
+from tkinter import ttk
+from threading import Thread, Barrier
+import pygame
+import os
+import sys
+
+kletki = {}
+kletkix = []
+kletkiy = []
+ysl_rozh = ["3"]
+ysl_zhizn = ['2', '3']
+place_map={}
+version = "v0.9.1"
+tik_prov = -1
+tikclock = 0
+s_fps = 0
+s_avg = 0
+nach = 0
+bar2 = Barrier(2)
+bar_gen = Barrier(2)
+Stop = True
+t_minus = 0
+button_infinite_on = False
+printing = True
+dal = 0
+run = True
+x = 100
+y = 100
+x_last = 0
+y_last = 0
+typi_last = "q"
+right = False
+left = False
+now_last = 0
+asd = 0
+pol_x = 900
+pol_y = 900
+
+res = 0
+
+
+# ■□
+def printt():
+    words = f"{tikclock}\n\t"
+    for i in range(len(kletkiy)):
+        xe = kletkiy[i][0]
+        ye = kletkiy[i][1]
+        if kletki[xe, ye] == 1:
+            words += "8"
+        else:
+            words += "."
+        if i % x == x - 1:
+            words += "\n\t"
+    print(words)
+
+
+def update_all():
+    global s_fps, s_avg, bar2, nach, t_minus, now_last, asd
+
+    bar2.wait()
+    nach = t.time()
+    t.sleep(.001)
+    while True:
+        now = t.time()
+        i = 1
+        ttt = s_avg / (now - nach - t_minus)
+        if ttt < 10:
+            i = 2
+        if ttt > 999:
+            l_avg.config(text=f"AVG:{int(ttt)}")
+        else:
+            l_avg.config(text=f"AVG:{round(ttt, i)}")
+
+        l_ticks.config(text=f"Tiks: {tikclock}")
+        l_time.config(text=f"Time: {round(now - nach - t_minus, 2)}s.")
+        if Stop:
+            tt = t.time()
+            while Stop:
+                pass
+            t_minus += t.time() - tt
+        if int(now) != now_last:
+            l_fps.config(text=f"FPS:{s_fps}")
+            s_fps = 0
+            asd = 0
+
+        now_last = int(now)
+
+
+def tick():
+    global kletki, tikclock, s_avg, s_fps, kletkiback
+    kletkinow = kletki.copy()
+
+    for elem in kletkiy:
+        xe = elem[0]
+        ye = elem[1]
+        sum = kletki[xe - 1, ye - 1] + kletki[xe, ye - 1] + kletki[xe + 1, ye - 1] + kletki[xe - 1, ye] + kletki[
+            xe + 1, ye] + kletki[xe - 1, ye + 1] + kletki[xe, ye + 1] + kletki[xe + 1, ye + 1]
+
+        if (str(sum) in ysl_rozh) or ((kletki[xe, ye] == 1) and (str(sum) in ysl_zhizn)):
+            kletkinow[xe, ye] = 1
+            # print(xe, ye, ": 0", sum)
+        else:
+            kletkinow[xe, ye] = 0
+            # print(xe, ye, ": 1", sum)
+    kletkiback = kletki
+    kletki = kletkinow
+    tikclock += 1
+    s_fps += 1
+    s_avg += 1
+
+
+def prov():
+    global kletki, tikclock, kletkiback, kletkinow, bar, s_fps, s_avg
+    tikclock += 1
+    kletkinow = kletki.copy()
+    s_fps += 1
+    s_avg += 1
+
+    line_last = line_last_base
+    line_norm = []
+    for i in range(x + 2):
+        line_norm.append(kletki[i - 1, 0])
+    pos = 0
+
+    for ye in range(y):
+
+        line_fute = []
+        for s in range(x + 2):
+            line_fute.append(kletki[s - 1, pos + 1])
+
+        for xe in range(x):
+            sum = line_last[xe] + line_last[xe + 1] + line_last[xe + 2] + line_norm[xe] + line_norm[xe + 2] + line_fute[
+                xe] + line_fute[xe + 1] + line_fute[xe + 2]
+
+            if (str(sum) in ysl_rozh) or ((line_norm[xe + 1] == 1) and (str(sum) in ysl_zhizn)):
+                kletkinow[xe, ye] = 1
+            else:
+                kletkinow[xe, ye] = 0
+
+        pos += 1
+        line_last = line_norm
+        line_norm = line_fute
+
+    # printt()
+    if kletkinow == kletkiback:
+        kletkiback = kletki
+        kletki = kletkinow
+        if not button_infinite_on:
+            return True
+        else:
+            return False
+    else:
+        kletkiback = kletki
+        kletki = kletkinow
+        return False
+
+
+def printing_thread(vs, num):
+    global kletkiback
+    h = int(y * (num / vs))
+    while True:
+        if printing:
+            printing_bar.wait()
+            printing_bar.wait()
+            try:
+                for ye in range(y // vs):
+                    ye += h
+                    for xe in range(x):
+                        if kletki[xe, ye] != kletkiback[xe, ye] or tikclock % 5 == 0:
+                            if kletki[xe, ye] == 1:
+                                sqare_base.fill("White")
+                                screen.blit(sqare_base, (xe * xr, ye * yr))
+                            elif kletki[xe, ye] == 0:
+                                sqare_base.fill("Black")
+                                screen.blit(sqare_base, (xe * xr, ye * yr))
+
+            except:
+                kletkiback = kletki
+                screen.fill((50, 50, 50))
+
+
+
+# def printing_thread(vs, num):
+#     global kletkiback
+#     h = int(y * (num / vs))
+#     while True:
+#         if printing:
+#             printing_bar.wait()
+#             printing_bar.wait()
+#             print(place_map[(0,0)])
+#             screen.blit(sqare_base,place_map[1,1])
+#             pygame.display.update()
+#             #try:
+#             for ye in range(y // vs):
+#                 ye += h
+#                 for xe in range(x):
+#                     if kletki[xe, ye] != kletkiback[xe, ye] or tikclock % 5 == 0:
+#                         if kletki[xe, ye] == 1:
+#                             sqare_base.fill("White")
+#                         elif kletki[xe, ye] == 0:
+#                             sqare_base.fill("Black")
+#                         screen.blit(sqare_base, place_map[xe,ye])
+#
+#
+#             # except:
+#             #     kletkiback = kletki
+#             #     screen.fill((50, 50, 50))
+
+
+def printing_thread_osob(nach, kon):
+    h = nach
+    while True:
+        if printing:
+            printing_bar.wait()
+            printing_bar.wait()
+            for ye in range(kon - nach):
+                ye += h
+                for xe in range(x):
+                    try:
+                        if kletki[xe, ye] == kletkiback[xe, ye] or tikclock % 5 == 0:
+                            if kletki[xe, ye] == 1:
+                                sqare_base.fill("White")
+                                screen.blit(sqare_base, (xe * xr, ye * yr))
+                            elif kletki[xe, ye] == 0:
+                                sqare_base.fill("Black")
+                                screen.blit(sqare_base, (xe * xr, ye * yr))
+                    except:
+                        pass
+
+
+def sozd():
+    global line_last_base, line_norm_base, kletki, kletkiy, kletkix, kletkiback, x_okn, y_okn
+    kletki_now = {}
+    kletkix_now = []
+    kletkiy_now = []
+    place_map = {}
+
+    for xe in range(x):
+        for ye in range(y):
+            kletkiy_now.append([xe, ye])
+            kletkix_now.append([xe, ye])
+            try:
+                kletki_now[xe, ye] = 0
+            except:
+                kletki_now[xe, ye] = 0
+            place_map[xe,ye]="sqare_base"
+
+    sqare_x_kol=x_okn-xr*x
+    sqare_y_kol=y_okn-yr*y
+    # print("\n\naa")
+    # print(sqare_x_kol)
+    # if sqare_x_kol!=0:
+    #     for xe in range(0,sqare_x_kol):
+    #         xe=int(xe*x/sqare_x_kol)
+    #         print(f"{xe=}")
+    #         for ye in range(y):
+    #             place_map[xe,ye]="sqare_x"
+    # if sqare_y_kol!=0:
+    #     for ye in range(0,sqare_y_kol):
+    #         ye=int(ye*y/sqare_y_kol)
+    #         print(f"{ye=}")
+    #         for xe in range(x):
+    #             if place_map[xe,ye]=="sqare_x":
+    #                 place_map[xe,ye]="sqare_xy"
+    #             else:
+    #                 place_map[xe, ye] = "sqare_y"
+    #
+    #
+    # xf=0
+    # yf=0
+    # for ye in range(y):
+    #     global q
+    #     for xe in range(x):
+    #         q=place_map[xe,ye]
+    #         place_map[xe, ye] = (xf, yf)
+    #         if q=="sqare_base":
+    #             xf+=xr
+    #         elif q=="sqare_x" or q=="sqare_xy":
+    #             xf+=xr+1
+    #     xf=0
+    #     if q == "sqare_y" or q=="sqare_xy":
+    #         yf += yr+1
+    #     else:
+    #         yf+=yr
+    # print(f"{place_map=}")
+    for i in range(x):
+        kletki_now[i, -1] = 0
+        kletki_now[i, y] = 0
+        kletkix_now.append([i, y])
+        kletkix_now.append([i, -1])
+    for i in range(y):
+        kletki_now[-1, i] = 0
+        kletki_now[x, i] = 0
+        kletkix_now.append([x, i])
+        kletkix_now.append([-1, i])
+
+    kletki_now[-1, -1] = 0
+    kletki_now[-1, y] = 0
+    kletki_now[x, -1] = 0
+    kletki_now[x, y] = 0
+    kletkix_now.append([-1, -1])
+    kletkix_now.append([-1, y])
+    kletkix_now.append([x, -1])
+    kletkix_now.append([x, y])
+    kletkiback = kletki
+
+    line_last_base = []
+    line_norm_base = []
+
+    for i in range(x + 2):
+        line_last_base.append(0)
+        line_norm_base.append(kletki_now[i - 1, 0])
+
+    kletki = kletki_now
+    kletkix = kletkix_now
+    kletkiy = kletkiy_now
+
+    # print("kletki: ", len(kletki), kletki)
+    # print("kletkix: ", len(kletkix), kletkix)
+    # print("kletkiy: ", len(kletkiy), kletkiy)
+
+    # print(ysl_rozh)
+    # print(ysl_zhizn)
+    # printt()
+
+
+def inf():
+    global button_infinite_on
+    if button_infinite_on:
+        button_infinite_on = False
+        button_infinite.config(bg="green")
+    else:
+        button_infinite_on = True
+        button_infinite.config(bg="purple")
+
+
+def end():
+    global run
+    run = False
+    win.destroy()
+    print("YEZZ")
+    exit()
+
+
+def printing_command():
+    printt()
+
+
+def Stopping():
+    global Stop
+    if Stop:
+        Stop = False
+        button_stop.config(text="Stop", bg="red")
+        button_1tik.config(state="disabled")
+        button_print.config(state="disabled")
+    else:
+        Stop = True
+        button_stop.config(text="Start", bg="green")
+        button_1tik.config(state="active")
+        button_print.config(state="active")
+
+
+def no_printing():
+    global printing
+    if printing:
+        printing = False
+        button_printing.config(text="No printing", bg="green", font=('Arial', 10))
+    else:
+        printing = True
+        button_printing.config(text="Printing", bg="purple", font=('Arial', 15))
+
+
+def restart():
+    trys=[__file__,os.path.basename(__file__),os.path.abspath(__file__),sys.argv[0]]
+    pop=1
+    for elem in trys:
+        print(elem)
+        print(f"Попытка номер {pop}",end=" ")
+        try:
+            os.startfile(elem)
+            print("УДАЧНА!!")
+            end()
+            break
+        except FileNotFoundError:
+            print(f"неудачна")
+
+        pop+=1
+
+
+def display_update():
+    global asd
+    while run:
+        printing_bar.wait()
+        pygame.display.update()
+        asd += 1
+        printing_bar.wait()
+
+
+def window_print():
+    global screen, run, sqare_base, sqaremini, clock, left, right, pos_y, pos_x
+    pygame.init()
+    pygame.display.set_caption("Поле")
+    sqaremini = pygame.Surface((3, 3))
+    screen = pygame.display.set_mode((pol_x, pol_y))
+    Thread(target=display_update, daemon=True).start()
+    cyrsor_x = 0
+    cyrsor_y = 0
+    while run:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                pygame.quit()
+            if event.type == pygame.MOUSEMOTION:
+                cyrsor_x += event.rel[0]
+                cyrsor_y += event.rel[1]
+                pos_x = cyrsor_x // xr
+                pos_y = cyrsor_y // yr
+                if left:
+                    kletki[pos_x, pos_y] = 1
+                if right:
+                    kletki[pos_x, pos_y] = 0
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    left = True
+                    kletki[pos_x, pos_y] = 1
+                if event.button == 3:
+                    right = True
+                    kletki[pos_x, pos_y] = 0
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    left = False
+                if event.button == 3:
+                    right = False
+
+
+def apply():
+    global x, y, kol_tikov, ysl_zhizn, ysl_rozh, x_okn, y_okn, xr, yr, sqare_base, kletki, kletkix, kletkiy, x_last, y_last, typi_last,tikclock,sqare_x,sqare_y,sqare_xy
+    x = int(x_Entry.get())
+    y = int(y_Entry.get())
+    kol_tikov = int(kol_tikov_Entry.get())
+    ysl_zhizn = zhiz_Entry.get().split(",")
+    ysl_rozh = rozh_Entry.get().split(",")
+    x_okn = pol_x
+    y_okn = pol_y
+
+    typi = spawn_combo.get()
+
+    if x_last != x or y_last != y or typi_last != typi:
+        if not Stop:
+            Stopping()
+        xr = x_okn // x
+        yr = y_okn // y
+        sqare_base = pygame.Surface((xr, yr))
+        sqare_x = pygame.Surface((xr+1, yr))
+        sqare_y = pygame.Surface((xr, yr+1))
+        sqare_xy = pygame.Surface((xr+1, yr+1))
+        sozd()
+
+        if typi == "cells":
+            for ye in range(y):
+                for xe in range(x):
+                    if ye % 3 != 0 and xe % 3 != 0:
+                        kletki[xe, ye] = 1
+                    else:
+                        kletki[xe, ye] = 0
+
+        elif typi == "full random":
+            for ye in range(y):
+                for xe in range(x):
+                    kletki[xe, ye] = random.randint(0, 1)
+        x_last = x
+        y_last = y
+        typi_last = typi
+        tikclock=0
+
+    # pygame.display.set_mode((xr * x, yr * y))
+    # pygame.quit()
+    # window_print()
+    # print()
+    # print(x,y,kol_tikov,ysl_rozh,ysl_zhizn,end="")
+
+
+def dack_to_first_settings():
+    x_Entry.config(textvariable=tk.StringVar(value="100"))
+    y_Entry.config(textvariable=tk.StringVar(value="100"))
+    kol_tikov_Entry.config(textvariable=tk.StringVar(value="10"))
+    zhiz_Entry.config(textvariable=tk.StringVar(value="2,3"))
+    rozh_Entry.config(textvariable=tk.StringVar(value="3"))
+    spawn_combo.current(0)
+    # apply()
+
+
+def window_ypr():
+    global button_stop, l_fps, l_avg, root, l_ticks, l_time, button_print, button_1tik, button_infinite, win, button_printing, x_Entry, y_Entry, kol_tikov_Entry, rozh_Entry, zhiz_Entry, spawn_combo
+    win = tk.Tk()
+    win.geometry(f"+200+200")
+    win.title("Управление")
+    sas = ("cells", "full random", "clear")
+
+    l_fps = tk.Label(win, text="start", bg="gray", font=('Arial', 13))
+    l_avg = tk.Label(win, text="start", bg="gray", font=('Arial', 13))
+    l_ticks = tk.Label(win, text="Tiks: 0", bg="gray", font=('Arial', 13))
+    l_time = tk.Label(win, text="Time: 0", bg="gray", font=('Arial', 13))
+    spawn_l = tk.Label(win, text="Choose spawn", font=('Arial', 8))
+    button_stop = tk.Button(win, text="Stop", command=Stopping, bg="green", font=('Arial', 17), width=5)
+    button_print = tk.Button(win, text="Print", command=printing_command, font=('Arial', 17), width=5)
+    button_1tik = tk.Button(win, text="+1 tick", command=tick, font=('Arial', 17), width=5)
+    button_infinite = tk.Button(win, text="Infinity", command=inf, bg="green", font=('Arial', 17), width=5)
+    button_exit = tk.Button(win, text="Exit", command=end, bg="red", font=('Arial', 17), width=5)
+    button_apply = tk.Button(win, text="Apply", command=apply, bg="green", font=('Arial', 15))
+    button_first_set = tk.Button(win, text="First\nsettings", command=dack_to_first_settings, bg="green",
+                                 font=('Arial', 11))
+    button_restart = tk.Button(win, text="Restart", command=restart, bg="red", font=('Arial', 15), width=5)
+    button_printing = tk.Button(win, text="Printing", command=no_printing, bg="purple", font=('Arial', 15), width=5)
+    x_Label = tk.Label(win, text="x", font=('Arial', 13))
+    y_Label = tk.Label(win, text="y", font=('Arial', 13))
+    x_Entry = tk.Entry(win, justify='center', font=('Arial', 13), textvariable=tk.StringVar(value="100"), width=2)
+    y_Entry = tk.Entry(win, justify='center', font=('Arial', 13), textvariable=tk.StringVar(value="100"), width=2)
+    rozh = tk.Label(win, text="cond. birth", font=('Arial', 13))
+    zhiz = tk.Label(win, text="cond. live", font=('Arial', 13))
+    rozh_Entry = tk.Entry(win, justify='center', font=('Arial', 13), textvariable=tk.StringVar(value="3"), width=2)
+    zhiz_Entry = tk.Entry(win, justify='center', font=('Arial', 13), textvariable=tk.StringVar(value="2,3"), width=2)
+    kol_tikov_Label = tk.Label(win, text="FPS", font=('Arial', 13))
+    kol_tikov_Entry = tk.Entry(win, justify='center', font=('Arial', 13), textvariable=tk.StringVar(value="10"),
+                               width=2)
+    spawn_combo = ttk.Combobox(win, values=sas, width=1)
+
+    space = tk.Label(win)
+    spawn_combo.current(0)
+
+    x_Label.grid(row=0, column=0, stick="wens")
+    y_Label.grid(row=0, column=1, stick="wens")
+    x_Entry.grid(row=1, column=0, stick="wens")
+    y_Entry.grid(row=1, column=1, stick="wens")
+    rozh.grid(row=0, column=2, stick="wens")
+    zhiz.grid(row=0, column=3, stick="wens")
+    rozh_Entry.grid(row=1, column=2, stick="wens")
+    zhiz_Entry.grid(row=1, column=3, stick="wens")
+    kol_tikov_Label.grid(row=2, column=0, stick="wens")
+    spawn_l.grid(row=2, column=1, stick="wens")
+    spawn_combo.grid(row=3, column=1, stick="wens")
+    kol_tikov_Entry.grid(row=3, column=0, stick="wens")
+    button_apply.grid(row=2, column=3, rowspan=2, stick="wens")
+    button_first_set.grid(row=2, column=2, rowspan=2, stick="wens")
+
+    space.grid(row=4, column=0, columnspan=4, stick="wens")
+    pos_x, pos_y = 0, 5
+
+    l_fps.grid(row=pos_y + 0, column=pos_x + 0, stick="wens", columnspan=2)
+    l_avg.grid(row=pos_y + 1, column=pos_x + 0, stick="wens", columnspan=2)
+    button_stop.grid(row=pos_y + 2, column=pos_x, stick="wens")
+    button_1tik.grid(row=pos_y + 2, column=pos_x + 1, stick="wens")
+    button_print.grid(row=pos_y + 3, column=pos_x + 1, stick="wens")
+    l_ticks.grid(row=pos_y + 0, column=pos_x + 2, stick="wens", columnspan=2)
+    l_time.grid(row=pos_y + 1, column=pos_x + 2, stick="wens", columnspan=2)
+    button_infinite.grid(row=pos_y + 2, column=pos_x + 2, stick="wens")
+    button_printing.grid(row=pos_y + 3, column=pos_x + 2, stick="wens")
+    button_exit.grid(row=pos_y + 2, column=pos_x + 3, stick="wens")
+    button_restart.grid(row=pos_y + 3, column=pos_x + 3, stick="wens")
+
+    # x_Entry.grid(row=0,column=0)
+
+    # space.grid(row=3, column=2, stick="wens")
+    # space1.grid(row=3, column=1, stick="wens")
+    bar_gen.wait()
+    apply()
+    Thread(target=window_print, name="win_p", daemon=True).start()
+    Thread(target=update_all, name="update_all", daemon=True).start()
+    if not Stop:
+        Stopping()
+    win.mainloop()
+
+
+def main():
+    global x_okn, y_okn, x, y, kol_tikov, kletki, Stop, dal, tikclock, ysl_rozh, ysl_zhizn, s_avg, s_fps, printing_bar, kletkiback, pol_x, pol_y
+    kol_printing_threads = 1
+    if y % 10 != 0:
+        printing_bar = Barrier(kol_printing_threads + 2)
+    else:
+        printing_bar = Barrier(kol_printing_threads + 1)
+
+    for i in range(kol_printing_threads):
+        Thread(target=printing_thread, daemon=True, args=[kol_printing_threads, i]).start()
+    if y % 10 != 0:
+        Thread(target=printing_thread_osob, daemon=True, args=[y // kol_printing_threads, y]).start()
+    kletki = {}
+    for xe in range(x):
+        for ye in range(y):
+            kletki[xe, ye] = 0
+
+    #q = input("Раскрыть доп. настройки?(да)")
+    q=" "
+    if q == "да" or q == "lf":
+        print("Для пропуска вопроса нажимите 'Enter'")
+        q = input("Хотите поменять размеры поля?")
+        if q == "да" or q == "lf":
+            pol_x = int(input("x поля(в пикселях, изначально x=900):\n"))
+            pol_y = int(input("y поля(в пикселях, изначально y=900):\n"))
+        print("Генерация поля\n", end="")
+        bar_gen.wait()
+        dal = 1
+        print("Генерация завершена")
+        q = input("Хотите увидеть результат(если есть)(да)")
+        if q == "да" or q == "lf":
+            tik_prov = int(input("Введите число тиков"))
+            bar2.wait()
+
+            while tik_prov > 1 or tik_prov <= 0:
+                if Stop:
+                    while Stop:
+                        pass
+                try:
+                    if prov():
+                        print("Решение найдено на " + str(tikclock) + " тике")
+                        print(f"Время решения: {round(t.time() - nach - t_minus, 2)} с.")
+                        Stop = True
+                        while True:
+                            pass
+                    else:
+                        tik_prov -= 1
+                except:
+                    pass
+            if tik_prov == 0:
+                print("за " + str(tikclock) + " проверок решение не найдено")
+                q = input("Продолжить симуляцию?(да)")
+                if q!="да" and q!="lf":
+                    end()
+
+    if dal == 0:
+        bar_gen.wait()
+        print("Генерация поля\n", end="")
+        bar2.wait()
+        print("Генерация завершена")
+        # printt()
+    else:
+        bar2.wait()
+
+    while True:
+        global kletkinow, bar
+        if Stop:
+            while Stop:
+                pass
+        tt = t.time()
+        kletkinow = kletki.copy()
+
+        line_last = line_last_base
+        line_norm = []
+        for i in range(x + 2):
+            line_norm.append(kletki[i - 1, 0])
+
+        pos = 0
+        try:
+            for ye in range(y):
+
+                line_fute = []
+                for s in range(x + 2):
+                    line_fute.append(kletki[s - 1, pos + 1])
+
+                for xe in range(x):
+                    summ = line_last[xe] + line_last[xe + 1] + line_last[xe + 2] + line_norm[xe] + line_norm[xe + 2] + \
+                           line_fute[
+                               xe] + line_fute[xe + 1] + line_fute[xe + 2]
+
+                    if (str(summ) in ysl_rozh) or ((line_norm[xe + 1] == 1) and (str(summ) in ysl_zhizn)):
+                        kletkinow[xe, ye] = 1
+                    else:
+                        kletkinow[xe, ye] = 0
+                pos += 1
+                line_last = line_norm
+                line_norm = line_fute
+
+            kletkiback = kletki
+            kletki = kletkinow
+
+            razn = t.time() - tt
+            raznn = razn
+            if kol_tikov != 0:
+                raznn = 1 / kol_tikov
+
+            raznitog = raznn - razn
+            if raznitog > 0:
+                t.sleep(raznitog)
+            tikclock += 1
+            s_fps += 1
+            s_avg += 1
+        except:
+            print("No")
+
+
+if __name__ == '__main__':
+    Thread(target=main, name="main", daemon=True).start()
+    window_ypr()
